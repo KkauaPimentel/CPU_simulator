@@ -25,6 +25,7 @@ typedef struct {
     uint16_t memory[MEMORY_SIZE];  // Memória (instruções e dados)
 } CPU;
 
+
 // Função para inicializar a CPU
 void initCPU(CPU *cpu) {
     for (int i = 0; i < 8; i++) {
