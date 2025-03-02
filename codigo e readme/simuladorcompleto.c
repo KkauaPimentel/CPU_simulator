@@ -45,7 +45,7 @@ void print_stack() {
   printf("\n");
 }
 
-// print de cada registrador e flags deles
+// print dos registradors r0 até r7, PC, LR e SP
 void print_registers() {
   printf("Registradores:\n");
   for (int i = 0; i < 8; i++) {
@@ -57,7 +57,7 @@ void print_registers() {
   printf("\n");
 }
 
-// printa as outras flags
+// print das flags c, ov, z e s
 void print_flags() {
   printf("Flags Finais:\n");
   printf("  C  : %d\n", flags.C);
