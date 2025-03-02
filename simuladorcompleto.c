@@ -410,7 +410,7 @@ int main(int argc, char *argv[]) {
             break;
           }
           default:
-            printf("Instrução indefinida: 0x%04X\n", instr);
+            printf("Instrucao indefinida: 0x%04X\n", instr);
             halt = 1;
             break;
         }
@@ -435,7 +435,7 @@ int main(int argc, char *argv[]) {
               PC = PC + offset;
             break;
           default:
-            printf("Instrução indefinida: 0x%04X\n", instr);
+            printf("Instrucao indefinida: 0x%04X\n", instr);
             halt = 1;
             break;
         }
@@ -590,7 +590,7 @@ int main(int argc, char *argv[]) {
         break;
       }
       default: {
-        printf("Instrução indefinida: 0x%04X\n", instr);
+        printf("Instrucao indefinida: 0x%04X\n", instr);
         halt = 1;
         break;
       }
