@@ -7,6 +7,7 @@
 #define STACK_SIZE 16
 #define MAX_TRACE 1024
 
+// estrutura que simula das flags
 typedef struct {
   int C;
   int Ov;
@@ -14,6 +15,7 @@ typedef struct {
   int S;
 } Flags;
 
+// variáveis globais da CPU
 uint16_t memory[MEM_SIZE];
 int accessed[MEM_SIZE];
 uint16_t reg[8];
@@ -27,13 +29,15 @@ int stack_index = 0;
 char trace[MAX_TRACE][128];
 int trace_count = 0;
 
-// Atualiza o SP (inicializado em 0x8200), decrementando 2 por elemento empilhado.
+// Atualiza o SP, decrementando 2 por elemento empilhado
 void update_SP() { 
   SP = 0x8200 - (stack_index * 2); 
 }
 
+// print do estado da pilha
 void print_stack() {
   printf("Pilha (endereco : conteudo):\n");
+
   for (int i = 0; i < STACK_SIZE; i++) {
     uint16_t addr = i * 2;
     printf("%04X : 0x%04X\n", addr, stack[i]);
@@ -41,6 +45,7 @@ void print_stack() {
   printf("\n");
 }
 
+// print de cada registrador e flags deles
 void print_registers() {
   printf("Registradores:\n");
   for (int i = 0; i < 8; i++) {
@@ -52,6 +57,7 @@ void print_registers() {
   printf("\n");
 }
 
+// printa as outras flags
 void print_flags() {
   printf("Flags Finais:\n");
   printf("  C  : %d\n", flags.C);
@@ -61,8 +67,8 @@ void print_flags() {
   printf("\n");
 }
 
-// Imprime a memória de dados acessada, no mesmo formato do arquivo de entrada.
-// Serão exibidas apenas as posições que foram marcadas como acessadas (desconsiderando a área da pilha).
+// imprime a memória de dados acessada no formato do arquivo txt do prof
+// Só exibe as posições que foram marcadas como acessadas
 void print_memory() {
   printf("Memoria de dados:\n");
   for (int i = 0; i < MEM_SIZE; i++) {
@@ -73,6 +79,7 @@ void print_memory() {
   printf("\n");
 }
 
+// imprime as instruções lidas
 void print_trace() {
   printf("===== INSTRUCOES =====\n");
   if (trace_count > 0)
@@ -83,6 +90,7 @@ void print_trace() {
   printf("\n");
 }
 
+// funções que auxiliam a interpretação de negativos
 int sign_extend_8(uint8_t imm) { 
   return (imm & 0x80) ? imm - 0x100 : imm; 
 }
@@ -91,6 +99,9 @@ int sign_extend_9(uint16_t imm) {
   return (imm & 0x100) ? imm - 0x200 : imm; 
 }
 
+// instr é a instrução que ta sendo lida
+// buf onde iremos armazenar a função "legivel"
+// a função interpreta qualquer que seja a instrução lida
 void decode_instruction(uint16_t instr, char *buf) {
   if (instr == 0x0000) {
     sprintf(buf, "NOP");
@@ -102,11 +113,11 @@ void decode_instruction(uint16_t instr, char *buf) {
   }
   
   uint8_t opcode = (instr >> 11) & 0x1F;
-  uint8_t suffix = instr & 0x3;
+  uint8_t sufixo = instr & 0x3;
   
   switch (opcode) {
     case 0x00:
-      switch(suffix) {
+      switch(sufixo) {
         case 0x0:
           sprintf(buf, "NOP");
           break;
@@ -132,9 +143,9 @@ void decode_instruction(uint16_t instr, char *buf) {
       }
       break;
     case 0x01: {
-      uint16_t immediate = (instr >> 2) & 0x1FF;
-      int offset = sign_extend_9(immediate) * 2;
-      switch (suffix) {
+      uint16_t imediato = (instr >> 2) & 0x1FF;
+      int offset = sign_extend_9(imediato) * 2;
+      switch (sufixo) {
         case 0x0:
           sprintf(buf, "JMP %d", offset);
           break;
@@ -161,8 +172,8 @@ void decode_instruction(uint16_t instr, char *buf) {
     }
     case 0x03: {
       uint8_t rd = (instr >> 8) & 0x7;
-      uint8_t immediate = instr & 0xFF;
-      sprintf(buf, "MOV R%d, #%d", rd, immediate);
+      uint8_t imediato = instr & 0xFF;
+      sprintf(buf, "MOV R%d, #%d", rd, imediato);
       break;
     }
     case 0x04: {
@@ -173,8 +184,8 @@ void decode_instruction(uint16_t instr, char *buf) {
     }
     case 0x05: {
       uint8_t rm = (instr >> 8) & 0x7;
-      uint8_t immediate = instr & 0xFF;
-      sprintf(buf, "STR [R%d], #%d", rm, immediate);
+      uint8_t imediato = instr & 0xFF;
+      sprintf(buf, "STR [R%d], #%d", rm, imediato);
       break;
     }
     case 0x06: {
@@ -184,7 +195,7 @@ void decode_instruction(uint16_t instr, char *buf) {
       break;
     }
     case 0x08: {
-      // ADD: Rd = Rm + Rn, atualizando flags e aplicando complemento 2 se houver carry.
+      // ADD: Rd = Rm + Rn, atualizando flags e aplicando complemento 2 se houver carry
       uint8_t rd = (instr >> 8) & 0x7;
       uint8_t rm = (instr >> 5) & 0x7;
       uint8_t rn = (instr >> 2) & 0x7;
@@ -216,7 +227,7 @@ void decode_instruction(uint16_t instr, char *buf) {
       break;
     }
     case 0x0C: {
-      // MUL: Rd = Rm * Rn, atualizando flags e aplicando complemento 2 se houver carry.
+      // MUL: Rd = Rm * Rn, atualizando flags e aplicando complemento 2 se houver carry
       uint8_t rd = (instr >> 8) & 0x7;
       uint8_t rm = (instr >> 5) & 0x7;
       uint8_t rn = (instr >> 2) & 0x7;
@@ -267,17 +278,17 @@ void decode_instruction(uint16_t instr, char *buf) {
     case 0x16: {
       uint8_t rd = (instr >> 8) & 0x7;
       uint8_t rm = (instr >> 5) & 0x7;
-      uint8_t immediate = instr & 0x1F;
-      reg[rd] = reg[rm] >> immediate;
-      sprintf(buf, "SHR R%d, R%d, #%d", rd, rm, immediate);
+      uint8_t imediato = instr & 0x1F;
+      reg[rd] = reg[rm] >> imediato;
+      sprintf(buf, "SHR R%d, R%d, #%d", rd, rm, imediato);
       break;
     }
     case 0x18: {
       uint8_t rd = (instr >> 8) & 0x7;
       uint8_t rm = (instr >> 5) & 0x7;
-      uint8_t immediate = instr & 0x1F;
-      reg[rd] = reg[rm] << immediate;
-      sprintf(buf, "SHL R%d, R%d, #%d", rd, rm, immediate);
+      uint8_t imediato = instr & 0x1F;
+      reg[rd] = reg[rm] << imediato;
+      sprintf(buf, "SHL R%d, R%d, #%d", rd, rm, imediato);
       break;
     }
     case 0x1A: {
@@ -353,21 +364,21 @@ int main(int argc, char *argv[]) {
 
   int halt = 0;
   while (PC <= max_addr && !halt) {
-    uint16_t current_addr = PC;
+    uint16_t addr_atual = PC;
     uint16_t instr = memory[PC];
     IR = instr;
     PC += 2;
     char decoded[128];
     decode_instruction(instr, decoded);
     if (trace_count < MAX_TRACE) {
-      sprintf(trace[trace_count], "%04X: %s", current_addr, decoded);
+      sprintf(trace[trace_count], "%04X: %s", addr_atual, decoded);
       trace_count++;
     }
     uint8_t opcode = (instr >> 11) & 0x1F;
-    uint8_t suffix = instr & 0x3;
+    uint8_t sufixo = instr & 0x3;
     switch (opcode) {
       case 0x00:
-        switch(suffix) {
+        switch(sufixo) {
           case 0x0:
             print_trace();
             print_stack();
@@ -416,9 +427,9 @@ int main(int argc, char *argv[]) {
         }
         break;
       case 0x01: {
-        uint16_t immediate = (instr >> 2) & 0x1FF;
-        int offset = sign_extend_9(immediate) * 2;
-        switch (suffix) {
+        uint16_t imediato = (instr >> 2) & 0x1FF;
+        int offset = sign_extend_9(imediato) * 2;
+        switch (sufixo) {
           case 0x0:
             PC = PC + offset;
             break;
@@ -449,8 +460,8 @@ int main(int argc, char *argv[]) {
       }
       case 0x03: {
         uint8_t rd = (instr >> 8) & 0x7;
-        uint8_t immediate = instr & 0xFF;
-        reg[rd] = immediate;
+        uint8_t imediato = instr & 0xFF;
+        reg[rd] = imediato;
         break;
       }
       case 0x04: {
@@ -465,10 +476,10 @@ int main(int argc, char *argv[]) {
       }
       case 0x05: {
         uint8_t rm = (instr >> 8) & 0x7;
-        uint8_t immediate = instr & 0xFF;
+        uint8_t imediato = instr & 0xFF;
         uint16_t addr = reg[rm];
         if (addr < MEM_SIZE) {
-          memory[addr] = immediate;
+          memory[addr] = imediato;
           accessed[addr] = 1;
         }
         break;
@@ -560,15 +571,15 @@ int main(int argc, char *argv[]) {
       case 0x16: {
         uint8_t rd = (instr >> 8) & 0x7;
         uint8_t rm = (instr >> 5) & 0x7;
-        uint8_t immediate = instr & 0x1F;
-        reg[rd] = reg[rm] >> immediate;
+        uint8_t imediato = instr & 0x1F;
+        reg[rd] = reg[rm] >> imediato;
         break;
       }
       case 0x18: {
         uint8_t rd = (instr >> 8) & 0x7;
         uint8_t rm = (instr >> 5) & 0x7;
-        uint8_t immediate = instr & 0x1F;
-        reg[rd] = reg[rm] << immediate;
+        uint8_t imediato = instr & 0x1F;
+        reg[rd] = reg[rm] << imediato;
         break;
       }
       case 0x1A: {
