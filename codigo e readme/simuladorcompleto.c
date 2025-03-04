@@ -6,8 +6,8 @@
 #define MEM_SIZE 65536
 #define STACK_SIZE 16
 #define MAX_TRACE 1024
+#define STACK_BASE 0x8200
 
-// estrutura que simula das flags
 typedef struct {
   int C;
   int Ov;
@@ -15,7 +15,6 @@ typedef struct {
   int S;
 } Flags;
 
-// variáveis globais da CPU
 uint16_t memory[MEM_SIZE];
 int accessed[MEM_SIZE];
 uint16_t reg[8];
@@ -24,28 +23,24 @@ uint16_t PC;
 uint16_t LR;
 uint16_t SP;
 Flags flags;
-uint16_t stack[STACK_SIZE];
-int stack_index = 0;
+uint16_t stack[STACK_SIZE]; 
+int stack_index = 0;         
 char trace[MAX_TRACE][128];
 int trace_count = 0;
 
-// Atualiza o SP, decrementando 2 por elemento empilhado
 void update_SP() { 
-  SP = 0x8200 - (stack_index * 2); 
+  SP = STACK_BASE - (stack_index * 2); 
 }
 
-// print do estado da pilha
 void print_stack() {
   printf("Pilha (endereco : conteudo):\n");
-
   for (int i = 0; i < STACK_SIZE; i++) {
-    uint16_t addr = i * 2;
+    uint16_t addr = STACK_BASE - (i * 2);
     printf("%04X : 0x%04X\n", addr, stack[i]);
   }
   printf("\n");
 }
 
-// print dos registradors r0 até r7, PC, LR e SP
 void print_registers() {
   printf("Registradores:\n");
   for (int i = 0; i < 8; i++) {
@@ -57,7 +52,6 @@ void print_registers() {
   printf("\n");
 }
 
-// print das flags c, ov, z e s
 void print_flags() {
   printf("Flags Finais:\n");
   printf("  C  : %d\n", flags.C);
@@ -67,8 +61,6 @@ void print_flags() {
   printf("\n");
 }
 
-// imprime a memória de dados acessada no formato do arquivo txt do prof
-// Só exibe as posições que foram marcadas como acessadas
 void print_memory() {
   printf("Memoria de dados:\n");
   for (int i = 0; i < MEM_SIZE; i++) {
@@ -79,7 +71,6 @@ void print_memory() {
   printf("\n");
 }
 
-// imprime as instruções lidas
 void print_trace() {
   printf("===== INSTRUCOES =====\n");
   if (trace_count > 0)
@@ -90,7 +81,6 @@ void print_trace() {
   printf("\n");
 }
 
-// funções que auxiliam a interpretação de negativos
 int sign_extend_8(uint8_t imm) { 
   return (imm & 0x80) ? imm - 0x100 : imm; 
 }
@@ -99,9 +89,6 @@ int sign_extend_9(uint16_t imm) {
   return (imm & 0x100) ? imm - 0x200 : imm; 
 }
 
-// instr é a instrução que ta sendo lida
-// buf onde iremos armazenar a função "legivel"
-// a função interpreta qualquer que seja a instrução lida
 void decode_instruction(uint16_t instr, char *buf) {
   if (instr == 0x0000) {
     sprintf(buf, "NOP");
@@ -195,7 +182,6 @@ void decode_instruction(uint16_t instr, char *buf) {
       break;
     }
     case 0x08: {
-      // ADD: Rd = Rm + Rn, atualizando flags e aplicando complemento 2 se houver carry
       uint8_t rd = (instr >> 8) & 0x7;
       uint8_t rm = (instr >> 5) & 0x7;
       uint8_t rn = (instr >> 2) & 0x7;
@@ -227,7 +213,6 @@ void decode_instruction(uint16_t instr, char *buf) {
       break;
     }
     case 0x0C: {
-      // MUL: Rd = Rm * Rn, atualizando flags e aplicando complemento 2 se houver carry
       uint8_t rd = (instr >> 8) & 0x7;
       uint8_t rm = (instr >> 5) & 0x7;
       uint8_t rn = (instr >> 2) & 0x7;
@@ -355,7 +340,7 @@ int main(int argc, char *argv[]) {
   }
   PC = min_addr;
   LR = 0;
-  SP = 0x8200;
+  SP = STACK_BASE; 
   flags.C = flags.Ov = flags.Z = flags.S = 0;
   for (int i = 0; i < STACK_SIZE; i++) {
     stack[i] = 0;
@@ -386,7 +371,7 @@ int main(int argc, char *argv[]) {
             print_flags();
             print_memory();
             break;
-          case 0x1: {
+          case 0x1: { 
             uint8_t rn = (instr >> 8) & 0x7;
             if (stack_index >= STACK_SIZE) {
               printf("Stack overflow\n");
@@ -398,7 +383,7 @@ int main(int argc, char *argv[]) {
             update_SP();
             break;
           }
-          case 0x2: {
+          case 0x2: { 
             if (stack_index <= 0) {
               printf("Stack underflow\n");
               halt = 1;
