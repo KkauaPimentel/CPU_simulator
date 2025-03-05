@@ -20,7 +20,6 @@ int accessed[MEM_SIZE];
 uint16_t reg[8];
 uint16_t IR;
 uint16_t PC;
-uint16_t LR;
 uint16_t SP;
 Flags flags;
 uint16_t stack[STACK_SIZE]; 
@@ -47,7 +46,6 @@ void print_registers() {
     printf("  R%d: 0x%04X\n", i, reg[i]);
   }
   printf("  PC: 0x%04X\n", PC);
-  printf("  LR: 0x%04X\n", LR);
   printf("  SP: 0x%04X\n", SP);
   printf("\n");
 }
@@ -339,7 +337,6 @@ int main(int argc, char *argv[]) {
     reg[i] = 0;
   }
   PC = min_addr;
-  LR = 0;
   SP = STACK_BASE; 
   flags.C = flags.Ov = flags.Z = flags.S = 0;
   for (int i = 0; i < STACK_SIZE; i++) {
