@@ -119,8 +119,8 @@ void decode_instruction(uint16_t instr, char *buf) {
           break;
         }
         case 0x2: {
-          uint8_t rn = (instr >> 2) & 0x7; 
-          sprintf(buf, "POP R%d", rn);
+          uint8_t rd = (instr >> 8) & 0x7; 
+          sprintf(buf, "POP R%d", rd);
           break;
         }
         case 0x3: {
@@ -382,31 +382,33 @@ int main(int argc, char *argv[]) {
           }
         }
         break;
-      case 0x01: {
-        uint16_t imediato = (instr >> 2) & 0x1FF;
-        int offset = sign_extend_9(imediato) * 2;
-        switch (sufixo) {
-          case 0x0:
-            PC = PC + offset;
-            break;
-          case 0x1:
-            if (flags.Z == 1 && flags.S == 0)
-              PC = PC + offset;
-            break;
-          case 0x2:
-            if (flags.Z == 0 && flags.S == 1)
-              PC = PC + offset;
-            break;
-          case 0x3:
-            if (flags.Z == 0 && flags.S == 0)
-              PC = PC + offset;
-            break;
-          default:
-            halt = 1;
-            break;
+        case 0x01: {
+          int offset = sign_extend_9((instr >> 2) & 0x1FF);
+          
+          switch (sufixo) {
+            case 0x0: // JMP
+              PC += offset;
+              break;
+            case 0x1: // JEQ
+              if (flags.Z == 1 && flags.S == 0)
+                PC += offset;
+              break;
+            case 0x2: // JLT
+              if (flags.Z == 0 && flags.S == 1)
+                PC += offset;
+              break;
+            case 0x3: // JGT
+              if (flags.Z == 0 && flags.S == 0)
+                PC += offset;
+              break;
+            default:
+              halt = 1;
+              break;
+          }
+          break;
         }
-        break;
-      }
+        
+        
       case 0x02: {
         uint8_t rd = (instr >> 8) & 0x7;
         uint8_t rm = (instr >> 5) & 0x7;
