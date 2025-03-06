@@ -60,7 +60,7 @@ void print_flags() {
 }
 
 void print_memory() {
-  printf("Memoria Acessada:\n");
+  printf("Memoria de dados:\n");
   for (int i = 0; i < MEM_SIZE; i++) {
     if (accessed[i] == 1) {
       if (i >= (STACK_BASE - (STACK_SIZE * 2)) && i < STACK_BASE)
@@ -114,23 +114,23 @@ void decode_instruction(uint16_t instr, char *buf) {
     case 0x00:
       switch (sufixo) {
         case 0x1: {
-          uint8_t rn = (instr >> 8) & 0x7;
+          uint8_t rn = (instr >> 2) & 0x7;  
           sprintf(buf, "PSH R%d", rn);
           break;
         }
         case 0x2: {
-          uint8_t rd = (instr >> 8) & 0x7;
-          sprintf(buf, "POP R%d", rd);
+          uint8_t rn = (instr >> 2) & 0x7; 
+          sprintf(buf, "POP R%d", rn);
           break;
         }
         case 0x3: {
-          uint8_t rm = (instr >> 8) & 0x7;
-          uint8_t rn = (instr >> 5) & 0x7;
+          uint8_t rm = (instr >> 5) & 0x7;
+          uint8_t rn = (instr >> 2) & 0x7;
           sprintf(buf, "CMP R%d, R%d", rm, rn);
           break;
         }
         default:
-          sprintf(buf, "Instrucao indefinida: 0x%04X", instr);
+          sprintf(buf, "Instrucao indefinida");
           break;
       }
       break;
@@ -169,14 +169,14 @@ void decode_instruction(uint16_t instr, char *buf) {
       break;
     }
     case 0x04: {
-      uint8_t rm = (instr >> 8) & 0x7;
-      uint8_t rn = (instr >> 5) & 0x7;
+      uint8_t rm = (instr >> 5) & 0x7;
+      uint8_t rn = (instr >> 2) & 0x7;
       sprintf(buf, "STR [R%d], R%d", rm, rn);
       break;
     }
     case 0x05: {
-      uint8_t rm = (instr >> 8) & 0x7;
-      uint8_t imediato = instr & 0xFF;
+      uint8_t rm = (instr >> 5) & 0x7;
+      uint8_t imediato = (((instr >> 8) & 0x7) << 5) | (instr & 0x1F);
       sprintf(buf, "STR [R%d], #%d", rm, imediato);
       break;
     }
@@ -264,11 +264,11 @@ void decode_instruction(uint16_t instr, char *buf) {
       if (instr == 0xFFFF)
         sprintf(buf, "HALT");
       else
-        sprintf(buf, "Instrucao indefinida: 0x%04X", instr);
+        sprintf(buf, "Instrucao indefinida");
       break;
     }
     default:
-      sprintf(buf, "Instrucao indefinida: 0x%04X", instr);
+      sprintf(buf, "Instrucao indefinida");
       break;
   }
 }
@@ -292,17 +292,22 @@ int main(int argc, char *argv[]) {
   unsigned int min_addr = MEM_SIZE, max_addr = 0;
   while (fgets(line, sizeof(line), fp)) {
     if (strchr(line, ':') != NULL) {
-      if (sscanf(line, "%x: %x", &addr, &value) == 2) {
-        if (addr < MEM_SIZE) {
-          memory[addr] = (uint16_t)value;
-          if (addr < min_addr)
-            min_addr = addr;
-          if (addr > max_addr)
-            max_addr = addr;
-        }
+      int ret = sscanf(line, "%x: %x", &addr, &value);
+      if (ret != 2) {  
+        fprintf(stderr, "Instrucao indefinida: %s", line);
+        memory[addr] = 0x8FAA;
+        continue; 
+      }
+      if (addr < MEM_SIZE) {
+        memory[addr] = (uint16_t)value;
+        if (addr < min_addr)
+          min_addr = addr;
+        if (addr > max_addr)
+          max_addr = addr;
       }
     }
   }
+  
   fclose(fp);
 
   for (int i = 0; i < 8; i++) {
@@ -338,7 +343,7 @@ int main(int argc, char *argv[]) {
         } else {
           switch (sufixo) {
             case 0x1: {
-              uint8_t rn = (instr >> 8) & 0x7;
+              uint8_t rn = (instr >> 2) & 0x7;  
               if (stack_index >= STACK_SIZE) {
                 printf("Stack overflow\n");
                 halt = 1;
@@ -362,8 +367,8 @@ int main(int argc, char *argv[]) {
               break;
             }
             case 0x3: {
-              uint8_t rm = (instr >> 8) & 0x7;
-              uint8_t rn = (instr >> 5) & 0x7;
+              uint8_t rm = (instr >> 5) & 0x7;
+              uint8_t rn = (instr >> 2) & 0x7;
               int16_t diff = (int16_t)reg[rm] - (int16_t)reg[rn];
               flags.Z = (diff == 0) ? 1 : 0;
               flags.C = (reg[rm] < reg[rn]) ? 1 : 0;
@@ -415,8 +420,8 @@ int main(int argc, char *argv[]) {
         break;
       }
       case 0x04: {
-        uint8_t rm = (instr >> 8) & 0x7;
-        uint8_t rn = (instr >> 5) & 0x7;
+        uint8_t rm = (instr >> 5) & 0x7;
+        uint8_t rn = (instr >> 2) & 0x7;
         uint16_t addr = reg[rm];
         if (addr < MEM_SIZE) {
           memory[addr] = reg[rn];
@@ -425,8 +430,8 @@ int main(int argc, char *argv[]) {
         break;
       }
       case 0x05: {
-        uint8_t rm = (instr >> 8) & 0x7;
-        uint8_t imediato = instr & 0xFF;
+        uint8_t rm = (instr >> 5) & 0x7;
+        uint8_t imediato = (((instr >> 8) & 0x7) << 5) | (instr & 0x1F);
         uint16_t addr = reg[rm];
         if (addr < MEM_SIZE) {
           memory[addr] = imediato;
@@ -467,14 +472,25 @@ int main(int argc, char *argv[]) {
         flags.S = ((reg[rd] & 0x8000) != 0) ? 1 : 0;
         break;
       }
-      case 0x0A: {
+      case 0x0A: { //SUB
         uint8_t rd = (instr >> 8) & 0x7;
         uint8_t rm = (instr >> 5) & 0x7;
         uint8_t rn = (instr >> 2) & 0x7;
-        reg[rd] = reg[rm] - reg[rn];
+        uint16_t result = reg[rm] - reg[rn];
+        reg[rd] = result;
+        flags.Z = (result == 0) ? 1 : 0;
+        flags.S = ((result & 0x8000) != 0) ? 1 : 0;
+        flags.C = (reg[rm] < reg[rn]) ? 1 : 0;
+        {
+          int16_t s_rm = (int16_t)reg[rm];
+          int16_t s_rn = (int16_t)reg[rn];
+          int16_t s_res = (int16_t)result;
+          flags.Ov = (((s_rm < 0) && (s_rn > 0) && (s_res > 0)) ||
+                      ((s_rm >= 0) && (s_rn < 0) && (s_res < 0))) ? 1 : 0;
+        }
         break;
       }
-      case 0x0C: {
+      case 0x0C: { //MUL
         uint8_t rd = (instr >> 8) & 0x7;
         uint8_t rm = (instr >> 5) & 0x7;
         uint8_t rn = (instr >> 2) & 0x7;
@@ -489,67 +505,115 @@ int main(int argc, char *argv[]) {
         flags.S = ((reg[rd] & 0x8000) != 0) ? 1 : 0;
         break;
       }
-      case 0x0E: {
+      case 0x0E: { //AND
         uint8_t rd = (instr >> 8) & 0x7;
         uint8_t rm = (instr >> 5) & 0x7;
         uint8_t rn = (instr >> 2) & 0x7;
-        reg[rd] = reg[rm] & reg[rn];
+        uint16_t result = reg[rm] & reg[rn];
+        reg[rd] = result;
+        flags.Z = (result == 0) ? 1 : 0;
+        flags.S = ((result & 0x8000) != 0) ? 1 : 0;
+        flags.C = 0;
+        flags.Ov = 0;
         break;
       }
-      case 0x10: {
+      case 0x10: { //ORR
         uint8_t rd = (instr >> 8) & 0x7;
         uint8_t rm = (instr >> 5) & 0x7;
         uint8_t rn = (instr >> 2) & 0x7;
-        reg[rd] = reg[rm] | reg[rn];
+        uint16_t result = reg[rm] | reg[rn];
+        reg[rd] = result;
+        flags.Z = (result == 0) ? 1 : 0;
+        flags.S = ((result & 0x8000) != 0) ? 1 : 0;
+        flags.C = 0;
+        flags.Ov = 0;
         break;
       }
-      case 0x12: {
+      case 0x12: { //NOT
         uint8_t rd = (instr >> 8) & 0x7;
         uint8_t rm = (instr >> 5) & 0x7;
-        reg[rd] = ~reg[rm];
+        uint16_t result = ~reg[rm];
+        reg[rd] = result;
+        flags.Z = (result == 0) ? 1 : 0;
+        flags.S = ((result & 0x8000) != 0) ? 1 : 0;
+        flags.C = 0;
+        flags.Ov = 0;
         break;
       }
-      case 0x14: {
+      case 0x14: { //XOR
         uint8_t rd = (instr >> 8) & 0x7;
         uint8_t rm = (instr >> 5) & 0x7;
         uint8_t rn = (instr >> 2) & 0x7;
-        reg[rd] = reg[rm] ^ reg[rn];
+        uint16_t result = reg[rm] ^ reg[rn];
+        reg[rd] = result;
+        flags.Z = (result == 0) ? 1 : 0;
+        flags.S = ((result & 0x8000) != 0) ? 1 : 0;
+        flags.C = 0;
+        flags.Ov = 0;
         break;
       }
-      case 0x16: {
+      case 0x16: { //SHR
         uint8_t rd = (instr >> 8) & 0x7;
         uint8_t rm = (instr >> 5) & 0x7;
         uint8_t imediato = instr & 0x1F;
-        reg[rd] = reg[rm] >> imediato;
+        uint16_t val = reg[rm];
+        uint16_t result = val >> imediato;
+        reg[rd] = result;
+        flags.Z = (result == 0);
+        flags.S = ((result & 0x8000) != 0);
+        if (imediato > 0) {
+          flags.C = ((val >> (imediato - 1)) & 1);
+        } else {
+          flags.C = 0;
+        }
+        flags.Ov = 0;
         break;
       }
-      case 0x18: {
+      case 0x18: { //SHL
         uint8_t rd = (instr >> 8) & 0x7;
         uint8_t rm = (instr >> 5) & 0x7;
         uint8_t imediato = instr & 0x1F;
-        reg[rd] = reg[rm] << imediato;
+        uint16_t val = reg[rm];
+        uint16_t result = val << imediato;
+        reg[rd] = result;
+        flags.Z = (result == 0);
+        flags.S = ((result & 0x8000) != 0);
+        if (imediato > 0) {
+          flags.C = ((val >> (16 - imediato)) & 1);
+        } else {
+          flags.C = 0;
+        }
+        flags.Ov = 0;
         break;
       }
-      case 0x1A: {
+      case 0x1A: { //ROR
         uint8_t rd = (instr >> 8) & 0x7;
         uint8_t rm = (instr >> 5) & 0x7;
         uint16_t val = reg[rm];
-        reg[rd] = (val >> 1) | ((val & 1) << 15);
+        uint8_t last_bit = val & 1;
+        uint16_t result = (val >> 1) | (last_bit << 15);
+        reg[rd] = result;
+        flags.Z = (result == 0);
+        flags.S = ((result & 0x8000) != 0);
+        flags.C = last_bit;
+        flags.Ov = 0;
         break;
       }
-      case 0x1C: {
+      case 0x1C: { //ROL
         uint8_t rd = (instr >> 8) & 0x7;
         uint8_t rm = (instr >> 5) & 0x7;
         uint16_t val = reg[rm];
-        reg[rd] = (val << 1) | (val >> 15);
+        uint8_t msb = (val >> 15) & 1;
+        uint16_t result = (val << 1) | msb;
+        reg[rd] = result;
+        flags.Z = (result == 0);
+        flags.S = ((result & 0x8000) != 0);
+        flags.C = msb;
+        flags.Ov = 0;
         break;
       }
       case 0x1F: {
-        if (instr != 0xFFFF) {
-          halt = 1;
-        } else {
-          halt = 1;
-        }
+        halt = 1;
         break;
       }
       default: {
