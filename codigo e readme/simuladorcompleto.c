@@ -3,9 +3,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define MEM_SIZE 65536
+#define MEM_SIZE   65536
 #define STACK_SIZE 16
-#define MAX_TRACE 1024
+#define MAX_TRACE  1024
 #define STACK_BASE 0x8200
 
 typedef struct {
@@ -22,13 +22,13 @@ uint16_t IR;
 uint16_t PC;
 uint16_t SP;
 Flags flags;
-uint16_t stack[STACK_SIZE]; 
-int stack_index = 0;         
+uint16_t stack[STACK_SIZE];
+int stack_index = 0;
 char trace[MAX_TRACE][128];
 int trace_count = 0;
 
 void update_SP() { 
-  SP = STACK_BASE - (stack_index * 2); 
+  SP = STACK_BASE - (stack_index * 2);
 }
 
 void print_stack() {
@@ -60,9 +60,11 @@ void print_flags() {
 }
 
 void print_memory() {
-  printf("Memoria de dados:\n");
+  printf("Memoria Acessada:\n");
   for (int i = 0; i < MEM_SIZE; i++) {
     if (accessed[i] == 1) {
+      if (i >= (STACK_BASE - (STACK_SIZE * 2)) && i < STACK_BASE)
+        continue;
       printf("%04X: 0x%04X\n", i, memory[i]);
     }
   }
@@ -79,12 +81,20 @@ void print_trace() {
   printf("\n");
 }
 
+void printAll(){
+  print_trace();
+  print_stack();
+  print_registers();
+  print_flags();
+  print_memory();
+}
+
 int sign_extend_8(uint8_t imm) { 
-  return (imm & 0x80) ? imm - 0x100 : imm; 
+  return (imm & 0x80) ? imm - 0x100 : imm;
 }
 
 int sign_extend_9(uint16_t imm) { 
-  return (imm & 0x100) ? imm - 0x200 : imm; 
+  return (imm & 0x100) ? imm - 0x200 : imm;
 }
 
 void decode_instruction(uint16_t instr, char *buf) {
@@ -102,10 +112,7 @@ void decode_instruction(uint16_t instr, char *buf) {
   
   switch (opcode) {
     case 0x00:
-      switch(sufixo) {
-        case 0x0:
-          sprintf(buf, "NOP");
-          break;
+      switch (sufixo) {
         case 0x1: {
           uint8_t rn = (instr >> 8) & 0x7;
           sprintf(buf, "PSH R%d", rn);
@@ -123,7 +130,7 @@ void decode_instruction(uint16_t instr, char *buf) {
           break;
         }
         default:
-          sprintf(buf, "INDEF 0x%04X", instr);
+          sprintf(buf, "Instrucao indefinida: 0x%04X", instr);
           break;
       }
       break;
@@ -183,22 +190,6 @@ void decode_instruction(uint16_t instr, char *buf) {
       uint8_t rd = (instr >> 8) & 0x7;
       uint8_t rm = (instr >> 5) & 0x7;
       uint8_t rn = (instr >> 2) & 0x7;
-      uint32_t full = (uint32_t)reg[rm] + (uint32_t)reg[rn];
-      flags.C = (full > 0xFFFF) ? 1 : 0;
-      uint16_t result = (uint16_t)full;
-      if (flags.C) {
-        result = (~result + 1) & 0xFFFF;
-      }
-      reg[rd] = result;
-      {
-        int16_t s_rm = (int16_t)reg[rm];
-        int16_t s_rn = (int16_t)reg[rn];
-        int16_t s_res = (int16_t)reg[rd];
-        flags.Ov = (((s_rm > 0) && (s_rn > 0) && (s_res < 0)) ||
-                    ((s_rm < 0) && (s_rn < 0) && (s_res >= 0))) ? 1 : 0;
-      }
-      flags.Z = (reg[rd] == 0) ? 1 : 0;
-      flags.S = ((reg[rd] & 0x8000) != 0) ? 1 : 0;
       sprintf(buf, "ADD R%d, R%d, R%d", rd, rm, rn);
       break;
     }
@@ -206,7 +197,6 @@ void decode_instruction(uint16_t instr, char *buf) {
       uint8_t rd = (instr >> 8) & 0x7;
       uint8_t rm = (instr >> 5) & 0x7;
       uint8_t rn = (instr >> 2) & 0x7;
-      reg[rd] = reg[rm] - reg[rn];
       sprintf(buf, "SUB R%d, R%d, R%d", rd, rm, rn);
       break;
     }
@@ -214,16 +204,6 @@ void decode_instruction(uint16_t instr, char *buf) {
       uint8_t rd = (instr >> 8) & 0x7;
       uint8_t rm = (instr >> 5) & 0x7;
       uint8_t rn = (instr >> 2) & 0x7;
-      uint32_t full = (uint32_t)reg[rm] * (uint32_t)reg[rn];
-      flags.C = (full > 0xFFFF) ? 1 : 0;
-      uint16_t result = (uint16_t)full;
-      if (flags.C) {
-        result = (~result + 1) & 0xFFFF;
-      }
-      reg[rd] = result;
-      flags.Ov = flags.C;
-      flags.Z = (reg[rd] == 0) ? 1 : 0;
-      flags.S = ((reg[rd] & 0x8000) != 0) ? 1 : 0;
       sprintf(buf, "MUL R%d, R%d, R%d", rd, rm, rn);
       break;
     }
@@ -231,7 +211,6 @@ void decode_instruction(uint16_t instr, char *buf) {
       uint8_t rd = (instr >> 8) & 0x7;
       uint8_t rm = (instr >> 5) & 0x7;
       uint8_t rn = (instr >> 2) & 0x7;
-      reg[rd] = reg[rm] & reg[rn];
       sprintf(buf, "AND R%d, R%d, R%d", rd, rm, rn);
       break;
     }
@@ -239,14 +218,12 @@ void decode_instruction(uint16_t instr, char *buf) {
       uint8_t rd = (instr >> 8) & 0x7;
       uint8_t rm = (instr >> 5) & 0x7;
       uint8_t rn = (instr >> 2) & 0x7;
-      reg[rd] = reg[rm] | reg[rn];
       sprintf(buf, "ORR R%d, R%d, R%d", rd, rm, rn);
       break;
     }
     case 0x12: {
       uint8_t rd = (instr >> 8) & 0x7;
       uint8_t rm = (instr >> 5) & 0x7;
-      reg[rd] = ~reg[rm];
       sprintf(buf, "NOT R%d, R%d", rd, rm);
       break;
     }
@@ -254,7 +231,6 @@ void decode_instruction(uint16_t instr, char *buf) {
       uint8_t rd = (instr >> 8) & 0x7;
       uint8_t rm = (instr >> 5) & 0x7;
       uint8_t rn = (instr >> 2) & 0x7;
-      reg[rd] = reg[rm] ^ reg[rn];
       sprintf(buf, "XOR R%d, R%d, R%d", rd, rm, rn);
       break;
     }
@@ -262,7 +238,6 @@ void decode_instruction(uint16_t instr, char *buf) {
       uint8_t rd = (instr >> 8) & 0x7;
       uint8_t rm = (instr >> 5) & 0x7;
       uint8_t imediato = instr & 0x1F;
-      reg[rd] = reg[rm] >> imediato;
       sprintf(buf, "SHR R%d, R%d, #%d", rd, rm, imediato);
       break;
     }
@@ -270,32 +245,30 @@ void decode_instruction(uint16_t instr, char *buf) {
       uint8_t rd = (instr >> 8) & 0x7;
       uint8_t rm = (instr >> 5) & 0x7;
       uint8_t imediato = instr & 0x1F;
-      reg[rd] = reg[rm] << imediato;
       sprintf(buf, "SHL R%d, R%d, #%d", rd, rm, imediato);
       break;
     }
     case 0x1A: {
       uint8_t rd = (instr >> 8) & 0x7;
       uint8_t rm = (instr >> 5) & 0x7;
-      uint16_t val = reg[rm];
-      reg[rd] = (val >> 1) | ((val & 1) << 15);
       sprintf(buf, "ROR R%d, R%d", rd, rm);
       break;
     }
     case 0x1C: {
       uint8_t rd = (instr >> 8) & 0x7;
       uint8_t rm = (instr >> 5) & 0x7;
-      uint16_t val = reg[rm];
-      reg[rd] = (val << 1) | (val >> 15);
       sprintf(buf, "ROL R%d, R%d", rd, rm);
       break;
     }
     case 0x1F: {
-      sprintf(buf, "HALT");
+      if (instr == 0xFFFF)
+        sprintf(buf, "HALT");
+      else
+        sprintf(buf, "Instrucao indefinida: 0x%04X", instr);
       break;
     }
     default:
-      sprintf(buf, "INDEF 0x%04X", instr);
+      sprintf(buf, "Instrucao indefinida: 0x%04X", instr);
       break;
   }
 }
@@ -318,11 +291,10 @@ int main(int argc, char *argv[]) {
   unsigned int addr, value;
   unsigned int min_addr = MEM_SIZE, max_addr = 0;
   while (fgets(line, sizeof(line), fp)) {
-    if (strchr(line, ':') != NULL && strstr(line, "0x") != NULL) {
-      if (sscanf(line, "%x: 0x%x", &addr, &value) == 2) {
+    if (strchr(line, ':') != NULL) {
+      if (sscanf(line, "%x: %x", &addr, &value) == 2) {
         if (addr < MEM_SIZE) {
           memory[addr] = (uint16_t)value;
-          accessed[addr] = 1;
           if (addr < min_addr)
             min_addr = addr;
           if (addr > max_addr)
@@ -356,56 +328,53 @@ int main(int argc, char *argv[]) {
       sprintf(trace[trace_count], "%04X: %s", addr_atual, decoded);
       trace_count++;
     }
+    
     uint8_t opcode = (instr >> 11) & 0x1F;
     uint8_t sufixo = instr & 0x3;
     switch (opcode) {
       case 0x00:
-        switch(sufixo) {
-          case 0x0:
-            print_trace();
-            print_stack();
-            print_registers();
-            print_flags();
-            print_memory();
-            break;
-          case 0x1: { 
-            uint8_t rn = (instr >> 8) & 0x7;
-            if (stack_index >= STACK_SIZE) {
-              printf("Stack overflow\n");
-              halt = 1;
+        if (instr == 0x0000) {
+          printAll();
+        } else {
+          switch (sufixo) {
+            case 0x1: {
+              uint8_t rn = (instr >> 8) & 0x7;
+              if (stack_index >= STACK_SIZE) {
+                printf("Stack overflow\n");
+                halt = 1;
+                break;
+              }
+              stack[stack_index] = reg[rn];
+              stack_index++;
+              update_SP();
               break;
             }
-            stack[stack_index] = reg[rn];
-            stack_index++;
-            update_SP();
-            break;
-          }
-          case 0x2: { 
-            if (stack_index <= 0) {
-              printf("Stack underflow\n");
-              halt = 1;
+            case 0x2: {
+              if (stack_index <= 0) {
+                printf("Stack underflow\n");
+                halt = 1;
+                break;
+              }
+              stack_index--;
+              update_SP();
+              uint8_t rd = (instr >> 8) & 0x7;
+              reg[rd] = stack[stack_index];
               break;
             }
-            stack_index--;
-            update_SP();
-            uint8_t rd = (instr >> 8) & 0x7;
-            reg[rd] = stack[stack_index];
-            break;
+            case 0x3: {
+              uint8_t rm = (instr >> 8) & 0x7;
+              uint8_t rn = (instr >> 5) & 0x7;
+              int16_t diff = (int16_t)reg[rm] - (int16_t)reg[rn];
+              flags.Z = (diff == 0) ? 1 : 0;
+              flags.C = (reg[rm] < reg[rn]) ? 1 : 0;
+              flags.S = (diff < 0) ? 1 : 0;
+              flags.Ov = 0;
+              break;
+            }
+            default:
+              halt = 1;
+              break;
           }
-          case 0x3: {
-            uint8_t rm = (instr >> 8) & 0x7;
-            uint8_t rn = (instr >> 5) & 0x7;
-            int16_t diff = (int16_t)reg[rm] - (int16_t)reg[rn];
-            flags.Z = (diff == 0) ? 1 : 0;
-            flags.C = (reg[rm] < reg[rn]) ? 1 : 0;
-            flags.S = (diff < 0) ? 1 : 0;
-            flags.Ov = 0;
-            break;
-          }
-          default:
-            printf("Instrucao indefinida: 0x%04X\n", instr);
-            halt = 1;
-            break;
         }
         break;
       case 0x01: {
@@ -428,7 +397,6 @@ int main(int argc, char *argv[]) {
               PC = PC + offset;
             break;
           default:
-            printf("Instrucao indefinida: 0x%04X\n", instr);
             halt = 1;
             break;
         }
@@ -485,9 +453,8 @@ int main(int argc, char *argv[]) {
         uint32_t full = (uint32_t)reg[rm] + (uint32_t)reg[rn];
         flags.C = (full > 0xFFFF) ? 1 : 0;
         uint16_t result = (uint16_t)full;
-        if (flags.C) {
+        if (flags.C)
           result = (~result + 1) & 0xFFFF;
-        }
         reg[rd] = result;
         {
           int16_t s_rm = (int16_t)reg[rm];
@@ -514,9 +481,8 @@ int main(int argc, char *argv[]) {
         uint32_t full = (uint32_t)reg[rm] * (uint32_t)reg[rn];
         flags.C = (full > 0xFFFF) ? 1 : 0;
         uint16_t result = (uint16_t)full;
-        if (flags.C) {
+        if (flags.C)
           result = (~result + 1) & 0xFFFF;
-        }
         reg[rd] = result;
         flags.Ov = flags.C;
         flags.Z = (reg[rd] == 0) ? 1 : 0;
@@ -579,23 +545,19 @@ int main(int argc, char *argv[]) {
         break;
       }
       case 0x1F: {
-        halt = 1;
+        if (instr != 0xFFFF) {
+          halt = 1;
+        } else {
+          halt = 1;
+        }
         break;
       }
       default: {
-        printf("Instrucao indefinida: 0x%04X\n", instr);
         halt = 1;
         break;
       }
     }
   }
-  if (halt == 1) {
-      PC -= 2;
-  }
-  print_trace();
-  print_stack();
-  print_registers();
-  print_flags();
-  print_memory();
+  printAll();
   return 0;
 }
